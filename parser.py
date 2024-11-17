@@ -5,6 +5,15 @@ from ihdr_information import IHDRInformation
 from plte_information import PLTEInformation
 import tkinter as tk
 
+COLOR_TYPES = {
+    0: 1,
+    2: 3,
+    3: 1,
+    4: 2,
+    6: 4
+}
+
+
 class Parser:
     def __init__(self):
         self.compressed_data_idat = b''
@@ -84,14 +93,14 @@ class Parser:
 
         bytes_per_pixel = self.get_bytes_per_pixel()
 
-        #Смотрим сколько пикселей в строке и умножаем на число байт, чтобы получить, сколько байт в строке
+        # Смотрим сколько пикселей в строке и умножаем на число байт, чтобы получить, сколько байт в строке
         stride = bytes_per_pixel * self.ihdr_information.width
         self.raw_image = []
 
         i = 0
-        #добавляем в сырое изображение строку вместе со своим фильтром, чтобы потом применить фильтр к каждой строке
+        # добавляем в сырое изображение строку вместе со своим фильтром, чтобы потом применить фильтр к каждой строке
         for row in range(self.ihdr_information.height):
-            filter_type = decompressed_data[i] # (каждая строка начинается с байта фильтра)
+            filter_type = decompressed_data[i]  # (каждая строка начинается с байта фильтра)
             i += 1
             scanline = decompressed_data[i:i + stride]
             i += stride
@@ -102,21 +111,24 @@ class Parser:
         # Применение фильтров для восстановления пиксельных данных
         # self.apply_filters() TODO
 
-    def get_bytes_per_pixel(self): #переделать бы это на константу-словарь...
+    def get_bytes_per_pixel(self): 
         color_type = self.ihdr_information.color_type
+        return COLOR_TYPES.get(color_type, ValueError(f"Unsupported color type: {color_type}"))
+        # if color_type == 0:  # Grayscale
+        #     return 1
+        # elif color_type == 2:  # Truecolor
+        #     return 3
+        # elif color_type == 3:  # Indexed-color
+        #     return 1
+        # elif color_type == 4:  # Grayscale with alpha
+        #     return 2
+        # elif color_type == 6:  # Truecolor with alpha
+        #     return 4
+        # else:
+        #     raise ValueError(f"Unsupported color type: {color_type}")
 
-        if color_type == 0:  # Grayscale
-            return 1
-        elif color_type == 2:  # Truecolor
-            return 3
-        elif color_type == 3:  # Indexed-color
-            return 1
-        elif color_type == 4:  # Grayscale with alpha
-            return 2
-        elif color_type == 6:  # Truecolor with alpha
-            return 4
-        else:
-            raise ValueError(f"Unsupported color type: {color_type}")
+    def display_image(self):
+        pass
 
 
 if __name__ == '__main__':
