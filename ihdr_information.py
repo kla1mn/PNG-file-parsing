@@ -1,5 +1,5 @@
 class IHDRInformation:
-    def __init__(self, width: bytes, height: bytes, bit_depth: bytes,
+    def __init__(self, width: int, height: int, bit_depth: bytes,
                  color_type: bytes, compression_method: bytes,
                  filter_method: bytes, interface_method: bytes):
         self.width = width
