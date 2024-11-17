@@ -91,7 +91,7 @@ class Parser:
         i = 0
         #добавляем в сырое изображение строку вместе со своим фильтром, чтобы потом применить фильтр к каждой строке
         for row in range(self.ihdr_information.height):
-            filter_type = decompressed_data[i]
+            filter_type = decompressed_data[i] # (каждая строка начинается с байта фильтра)
             i += 1
             scanline = decompressed_data[i:i + stride]
             i += stride
