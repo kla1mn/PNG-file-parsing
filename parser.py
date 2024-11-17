@@ -68,11 +68,11 @@ class Parser:
                 # input("Нажмите Enter для продолжения \n")
 
                 if chunk.chunk_type == b'IHDR':
-                    self.parse_IHDR(chunk)
+                    self._parse_IHDR(chunk)
                 elif chunk.chunk_type == b'IDAT':
-                    self.parse_IDAT(chunk)
+                    self._parse_IDAT(chunk)
                 elif chunk.chunk_type == b'PLTE':
-                    self.parse_PLTE(chunk)
+                    self._parse_PLTE(chunk)
                 elif chunk.chunk_type == b'IEND':
                     break
 
@@ -80,7 +80,7 @@ class Parser:
             if self.palette:
                 print(f"Parsed PLTE with {len(self.palette)} entries.")
 
-    def parse_IHDR(self, chunk: Chunk):
+    def _parse_IHDR(self, chunk: Chunk):
         data = chunk.data
         self.ihdr_information = IHDRInformation(
             width=int.from_bytes(data[0:4], 'big'),
@@ -93,11 +93,11 @@ class Parser:
         )
         print(f"Parsed IHDR: {self.ihdr_information}")
 
-    def parse_IDAT(self, chunk: Chunk):
+    def _parse_IDAT(self, chunk: Chunk):
         self.compressed_data_idat += chunk.data
         print(f"Accumulated IDAT data: {len(self.compressed_data_idat)} bytes.")
 
-    def parse_PLTE(self, chunk: Chunk):
+    def _parse_PLTE(self, chunk: Chunk):
         if self.ihdr_information.color_type != 3:
             print("PLTE chunk найден, но цветовой тип не 3 (Indexed-color). Игнорируем.")
             return
@@ -135,8 +135,8 @@ class Parser:
 
         print(f"Parsed {len(self.raw_image)} scanlines.")
 
-        self.apply_filters()
-        self.decode_pixels()
+        self._apply_filters()
+        self._decode_pixels()
 
     def get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
@@ -148,7 +148,7 @@ class Parser:
     def _get_stride(self):
         return self.ihdr_information.width * self.get_bytes_per_pixel()
 
-    def apply_filters(self):
+    def _apply_filters(self):
         print("Применяем фильтры для восстановления пиксельных данных...")
         self.image_data = []
         previous_scanline = bytearray([0] * self._get_stride())
@@ -159,16 +159,16 @@ class Parser:
                 recon = bytearray(scanline)
             elif filter_type == 1:
                 # Фильтр Sub
-                recon = self.filter_sub(scanline, self.get_bytes_per_pixel())
+                recon = self._filter_sub(scanline, self.get_bytes_per_pixel())
             elif filter_type == 2:
                 # Фильтр Up
-                recon = self.filter_up(scanline, previous_scanline)
+                recon = self._filter_up(scanline, previous_scanline)
             elif filter_type == 3:
                 # Фильтр Average
-                recon = self.filter_average(scanline, previous_scanline, self.get_bytes_per_pixel())
+                recon = self._filter_average(scanline, previous_scanline, self.get_bytes_per_pixel())
             elif filter_type == 4:
                 # Фильтр Paeth
-                recon = self.filter_paeth(scanline, previous_scanline, self.get_bytes_per_pixel())
+                recon = self._filter_paeth(scanline, previous_scanline, self.get_bytes_per_pixel())
             else:
                 print(f"Неизвестный тип фильтра: {filter_type}")
                 continue
@@ -181,19 +181,19 @@ class Parser:
 
         print("Все фильтры успешно применены.")
 
-    def filter_sub(self, scanline, bpp):
+    def _filter_sub(self, scanline, bpp):
         recon = bytearray(scanline)
         for i in range(bpp, len(recon)):
             recon[i] = (recon[i] + recon[i - bpp]) % 256
         return recon
 
-    def filter_up(self, scanline, previous):
+    def _filter_up(self, scanline, previous):
         recon = bytearray(scanline)
         for i in range(len(recon)):
             recon[i] = (recon[i] + previous[i]) % 256
         return recon
 
-    def filter_average(self, scanline, previous, bpp):
+    def _filter_average(self, scanline, previous, bpp):
         recon = bytearray(scanline)
         for i in range(len(recon)):
             left = recon[i - bpp] if i >= bpp else 0
@@ -201,7 +201,7 @@ class Parser:
             recon[i] = (recon[i] + (left + up) // 2) % 256
         return recon
 
-    def filter_paeth(self, scanline, previous, bpp):
+    def _filter_paeth(self, scanline, previous, bpp):
         recon = bytearray(scanline)
         for i in range(len(recon)):
             left = recon[i - bpp] if i >= bpp else 0
@@ -220,7 +220,7 @@ class Parser:
             recon[i] = (recon[i] + pr) % 256
         return recon
 
-    def decode_pixels(self):
+    def _decode_pixels(self):
         print("Декодируем пиксели из восстановленных данных...")
         width = self.ihdr_information.width
         height = self.ihdr_information.height
@@ -321,6 +321,6 @@ class Parser:
 
 if __name__ == '__main__':
     parser = Parser()
-    parser.parse("rgb.png")
+    parser.parse("pine.png")
     parser.decompress_data()
     parser.display_image()
