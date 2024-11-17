@@ -1,9 +1,11 @@
 from chunk import Chunk
+from ihdr_information import IHDRInformation
 
 
 class Parser:
     def __init__(self):
         self.chunks = []
+        self.ihdr_information = IHDRInformation()
 
     def read_chunks(self, file):
         while True:
@@ -40,8 +42,16 @@ class Parser:
                 print(chunk)
                 input("Нажмите Enter для продолжения \n")
 
-                if chunk.chunk_type == b'IEND':
+                if chunk.chunk_type == b'IHDR':
+                    self.parse_IHDR(chunk)
+                elif chunk.chunk_type == b'IEND':
                     break
+
+    def parse_IHDR(self, chunk: Chunk):
+        data = chunk.data
+        self.ihdr_information = IHDRInformation(data[0:4], data[4:8],
+                                                data[8], data[9],
+                                                data[10], data[11])
 
 
 if __name__ == '__main__':
