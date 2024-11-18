@@ -25,14 +25,14 @@ class Parser:
     def __init__(self):
         self.compressed_data_idat = b''
         self.chunks: List[Chunk] = []
-        self.ihdr_information: IHDRInformation = None
+        self.ihdr_information: IHDRInformation
         self.palette: List[PLTEInformation] = []
         self.raw_image = None
         self.image_data = []
         self.pixels = []
         self.mode = None
 
-    def read_chunks(self, file):
+    def _read_chunks(self, file):
         while True:
             length_bytes = file.read(4)
             if len(length_bytes) < 4:
@@ -58,7 +58,7 @@ class Parser:
             print()
 
             print("Начинаем читать чанки...")
-            self.read_chunks(file)
+            self._read_chunks(file)
 
             print()
 
@@ -116,7 +116,7 @@ class Parser:
         decompressed_data = zlib.decompress(self.compressed_data_idat)
         print(f"Decompressed data size: {len(decompressed_data)} bytes")
 
-        bytes_per_pixel = self.get_bytes_per_pixel()
+        bytes_per_pixel = self._get_bytes_per_pixel()
 
         stride = bytes_per_pixel * self.ihdr_information.width
         self.raw_image = []
@@ -138,15 +138,13 @@ class Parser:
         self._apply_filters()
         self._decode_pixels()
 
-    def get_bytes_per_pixel(self):
+    def _get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
-        bytes_per_pixel = COLOR_TYPES.get(color_type, None)
-        if bytes_per_pixel is None:
-            raise ValueError(f"Unsupported color type: {color_type}")
+        bytes_per_pixel = COLOR_TYPES.get(color_type, ValueError(f"Unsupported color type: {color_type}"))
         return bytes_per_pixel
 
     def _get_stride(self):
-        return self.ihdr_information.width * self.get_bytes_per_pixel()
+        return self.ihdr_information.width * self._get_bytes_per_pixel()
 
     def _apply_filters(self):
         print("Применяем фильтры для восстановления пиксельных данных...")
@@ -159,16 +157,16 @@ class Parser:
                 recon = bytearray(scanline)
             elif filter_type == 1:
                 # Фильтр Sub
-                recon = self._filter_sub(scanline, self.get_bytes_per_pixel())
+                recon = self._filter_sub(scanline, self._get_bytes_per_pixel())
             elif filter_type == 2:
                 # Фильтр Up
                 recon = self._filter_up(scanline, previous_scanline)
             elif filter_type == 3:
                 # Фильтр Average
-                recon = self._filter_average(scanline, previous_scanline, self.get_bytes_per_pixel())
+                recon = self._filter_average(scanline, previous_scanline, self._get_bytes_per_pixel())
             elif filter_type == 4:
                 # Фильтр Paeth
-                recon = self._filter_paeth(scanline, previous_scanline, self.get_bytes_per_pixel())
+                recon = self._filter_paeth(scanline, previous_scanline, self._get_bytes_per_pixel())
             else:
                 print(f"Неизвестный тип фильтра: {filter_type}")
                 continue
@@ -181,19 +179,22 @@ class Parser:
 
         print("Все фильтры успешно применены.")
 
-    def _filter_sub(self, scanline, bpp):
+    @staticmethod
+    def _filter_sub(scanline, bpp):
         recon = bytearray(scanline)
         for i in range(bpp, len(recon)):
             recon[i] = (recon[i] + recon[i - bpp]) % 256
         return recon
 
-    def _filter_up(self, scanline, previous):
+    @staticmethod
+    def _filter_up(scanline, previous):
         recon = bytearray(scanline)
         for i in range(len(recon)):
             recon[i] = (recon[i] + previous[i]) % 256
         return recon
 
-    def _filter_average(self, scanline, previous, bpp):
+    @staticmethod
+    def _filter_average(scanline, previous, bpp):
         recon = bytearray(scanline)
         for i in range(len(recon)):
             left = recon[i - bpp] if i >= bpp else 0
@@ -201,7 +202,8 @@ class Parser:
             recon[i] = (recon[i] + (left + up) // 2) % 256
         return recon
 
-    def _filter_paeth(self, scanline, previous, bpp):
+    @staticmethod
+    def _filter_paeth(scanline, previous, bpp):
         recon = bytearray(scanline)
         for i in range(len(recon)):
             left = recon[i - bpp] if i >= bpp else 0
@@ -222,8 +224,8 @@ class Parser:
 
     def _decode_pixels(self):
         print("Декодируем пиксели из восстановленных данных...")
-        width = self.ihdr_information.width
-        height = self.ihdr_information.height
+        # width = self.ihdr_information.width
+        # height = self.ihdr_information.height
         color_type = self.ihdr_information.color_type
         bit_depth = self.ihdr_information.bit_depth
 
@@ -286,14 +288,9 @@ class Parser:
 
         elif self.mode == "P":
             # Создаём изображение в режиме Palette (Indexed-color)
-            img = Image.new("P", (width, height))
-            flat_palette = []
-            for entry in self.palette:
-                flat_palette.extend([entry.R, entry.G, entry.B])
-            flat_palette += [0] * (768 - len(flat_palette))
-            img.putpalette(flat_palette)
-            flat_pixels = [pixel for row in self.pixels for pixel in row]
-            img.putdata(flat_pixels)
+            img = self._create_palette_image(height, width)
+            if width <= 50 or height <= 50:
+                img = self._rescale_if_smaller_50px(height, img, width)
             img.show()
 
         elif self.mode == "RGBA":
@@ -305,7 +302,19 @@ class Parser:
         else:
             raise NotImplementedError(f"Режим {self.mode} не поддерживается для отображения.")
 
-    def _rescale_if_smaller_50px(self, height, img, width):
+    def _create_palette_image(self, height, width):
+        img = Image.new("P", (width, height))
+        flat_palette = []
+        for entry in self.palette:
+            flat_palette.extend([entry.R, entry.G, entry.B])
+        flat_palette += [0] * (768 - len(flat_palette))
+        img.putpalette(flat_palette)
+        flat_pixels = [pixel for row in self.pixels for pixel in row]
+        img.putdata(flat_pixels)
+        return img
+
+    @staticmethod
+    def _rescale_if_smaller_50px(height, img, width):
         scale_factor = 100
         new_width = width * scale_factor
         new_height = height * scale_factor
@@ -317,10 +326,3 @@ class Parser:
         flat_pixels = [pixel for row in self.pixels for pixel in row]
         img.putdata(flat_pixels)
         return img
-
-
-if __name__ == '__main__':
-    parser = Parser()
-    parser.parse("pine.png")
-    parser.decompress_data()
-    parser.display_image()
