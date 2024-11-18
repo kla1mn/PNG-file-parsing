@@ -52,16 +52,12 @@ class Parser:
         with open(file_path, 'rb') as file:
             signature = file.read(8)
             if signature != b'\x89PNG\r\n\x1a\n':
-                raise ValueError("Not a valid PNG file")
+                raise ValueError("Не PNG файл, попробуйте другой")
 
-            print(f"Signature: {signature}")
+            print(f"Сигнатура: {signature}")
             print()
-
-            print("Начинаем читать чанки...")
             self._read_chunks(file)
-
             print()
-
             print("Начинаем печатать чанки...")
             for chunk in self.chunks:
                 print(chunk)
@@ -76,9 +72,9 @@ class Parser:
                 elif chunk.chunk_type == b'IEND':
                     break
 
-            print(f"Parsed IHDR: {self.ihdr_information}")
+            # print(f"Parsed IHDR: {self.ihdr_information}")
             if self.palette:
-                print(f"Parsed PLTE with {len(self.palette)} entries.")
+                print(f"Распарсили PLTE с {len(self.palette)} палитрой.\n")
 
     def _parse_IHDR(self, chunk: Chunk):
         data = chunk.data
@@ -91,19 +87,19 @@ class Parser:
             filter_method=data[11],
             interface_method=data[12]
         )
-        print(f"Parsed IHDR: {self.ihdr_information}")
+        print(f"Parsed IHDR: {self.ihdr_information}\n")
 
     def _parse_IDAT(self, chunk: Chunk):
         self.compressed_data_idat += chunk.data
-        print(f"Accumulated IDAT data: {len(self.compressed_data_idat)} bytes.")
+        print(f"Накопили IDAT информацию: {len(self.compressed_data_idat)} байт.\n")
 
     def _parse_PLTE(self, chunk: Chunk):
         if self.ihdr_information.color_type != 3:
-            print("PLTE chunk найден, но цветовой тип не 3 (Indexed-color). Игнорируем.")
+            print("PLTE чанк найден, но цветовой тип не 3 (Indexed-color). Игнорируем.")
             return
 
         if chunk.length % 3 != 0:
-            raise ValueError("Not a valid PNG file (the length of the PLTE data is not a multiple of three)")
+            raise ValueError("Невалидный PNG файл (длина PLTE информации не кратна трем)")
 
         data = chunk.data
         self.palette = []
@@ -114,7 +110,7 @@ class Parser:
     def decompress_data(self):
         print("Начинаем декомпрессию IDAT данных...")
         decompressed_data = zlib.decompress(self.compressed_data_idat)
-        print(f"Decompressed data size: {len(decompressed_data)} bytes")
+        print(f"Размер декомпрессионных данных: {len(decompressed_data)} байт")
 
         bytes_per_pixel = self._get_bytes_per_pixel()
 
@@ -133,14 +129,14 @@ class Parser:
             i += stride
             self.raw_image.append((filter_type, scanline))
 
-        print(f"Parsed {len(self.raw_image)} scanlines.")
+        print(f"Распарсили {len(self.raw_image)} scanlines.")
 
         self._apply_filters()
         self._decode_pixels()
 
     def _get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
-        bytes_per_pixel = COLOR_TYPES.get(color_type, ValueError(f"Unsupported color type: {color_type}"))
+        bytes_per_pixel = COLOR_TYPES.get(color_type, ValueError(f"Неподдерживаемый цветой тип: {color_type}"))
         return bytes_per_pixel
 
     def _get_stride(self):
