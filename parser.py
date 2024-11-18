@@ -32,22 +32,6 @@ class Parser:
         self.pixels = []
         self.mode = None
 
-    def _read_chunks(self, file):
-        while True:
-            length_bytes = file.read(4)
-            if len(length_bytes) < 4:
-                if len(length_bytes) == 0:
-                    print("Прочитали все чанки.")
-                else:
-                    print("У файла в конце чанк битый.")
-                break
-
-            length = int.from_bytes(length_bytes, 'big')
-            chunk_type = file.read(4)
-            data = file.read(length)
-            crc = file.read(4)
-            self.chunks.append(Chunk(length, chunk_type, data, crc))
-
     def parse(self, file_path: str):
         with open(file_path, 'rb') as file:
             signature = file.read(8)
@@ -75,6 +59,82 @@ class Parser:
             # print(f"Parsed IHDR: {self.ihdr_information}")
             if self.palette:
                 print(f"Распарсили PLTE с {len(self.palette)} палитрой.\n")
+
+    def decompress_data(self):
+        print("Начинаем декомпрессию IDAT данных...")
+        decompressed_data = zlib.decompress(self.compressed_data_idat)
+        print(f"Размер декомпрессионных данных: {len(decompressed_data)} байт")
+
+        bytes_per_pixel = self._get_bytes_per_pixel()
+
+        stride = bytes_per_pixel * self.ihdr_information.width
+        self.raw_image = []
+
+        i = 0
+        for row in range(self.ihdr_information.height):
+            if i >= len(decompressed_data):
+                raise ValueError("Недостаточно данных изображения.")
+            filter_type = decompressed_data[i]  # Каждая строка начинается с байта фильтра
+            i += 1
+            scanline = decompressed_data[i:i + stride]
+            if len(scanline) != stride:
+                raise ValueError("Длина сканлайна не соответствует ожидаемому значению.")
+            i += stride
+            self.raw_image.append((filter_type, scanline))
+
+        print(f"Распарсили {len(self.raw_image)} scanlines.")
+
+        self._apply_filters()
+        self._decode_pixels()
+
+    def display_image(self):
+        if not self.pixels:
+            raise ValueError(
+                "Данные изображения не декодированы. Вызовите decompress_data() и decode_pixels() сначала.")
+
+        width = self.ihdr_information.width
+        height = self.ihdr_information.height
+
+        print(f"Отображаем изображение: {width}x{height}, режим: {self.mode}")
+
+        if self.mode == "RGB":
+            # Создаём изображение в режиме RGB
+            img = self._create_image(height, width, Modes.RGB)
+            if width <= 50 or height <= 50:
+                img = self._rescale_if_smaller_50px(height, img, width)
+            img.show()
+
+        elif self.mode == "P":
+            # Создаём изображение в режиме Palette (Indexed-color)
+            img = self._create_palette_image(height, width)
+            if width <= 50 or height <= 50:
+                img = self._rescale_if_smaller_50px(height, img, width)
+            img.show()
+
+        elif self.mode == "RGBA":
+            # Создаём изображение в режиме RGBA
+            img = self._create_image(height, width, Modes.RGBA)
+            if width <= 50 or height <= 50:
+                img = self._rescale_if_smaller_50px(height, img, width)
+            img.show()
+        else:
+            raise NotImplementedError(f"Режим {self.mode} не поддерживается для отображения.")
+
+    def _read_chunks(self, file):
+        while True:
+            length_bytes = file.read(4)
+            if len(length_bytes) < 4:
+                if len(length_bytes) == 0:
+                    print("Прочитали все чанки.")
+                else:
+                    print("У файла в конце чанк битый.")
+                break
+
+            length = int.from_bytes(length_bytes, 'big')
+            chunk_type = file.read(4)
+            data = file.read(length)
+            crc = file.read(4)
+            self.chunks.append(Chunk(length, chunk_type, data, crc))
 
     def _parse_IHDR(self, chunk: Chunk):
         data = chunk.data
@@ -106,33 +166,6 @@ class Parser:
 
         for i in range(0, len(data), 3):
             self.palette.append(PLTEInformation(i // 3, data[i], data[i + 1], data[i + 2]))
-
-    def decompress_data(self):
-        print("Начинаем декомпрессию IDAT данных...")
-        decompressed_data = zlib.decompress(self.compressed_data_idat)
-        print(f"Размер декомпрессионных данных: {len(decompressed_data)} байт")
-
-        bytes_per_pixel = self._get_bytes_per_pixel()
-
-        stride = bytes_per_pixel * self.ihdr_information.width
-        self.raw_image = []
-
-        i = 0
-        for row in range(self.ihdr_information.height):
-            if i >= len(decompressed_data):
-                raise ValueError("Недостаточно данных изображения.")
-            filter_type = decompressed_data[i]  # Каждая строка начинается с байта фильтра
-            i += 1
-            scanline = decompressed_data[i:i + stride]
-            if len(scanline) != stride:
-                raise ValueError("Длина сканлайна не соответствует ожидаемому значению.")
-            i += stride
-            self.raw_image.append((filter_type, scanline))
-
-        print(f"Распарсили {len(self.raw_image)} scanlines.")
-
-        self._apply_filters()
-        self._decode_pixels()
 
     def _get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
@@ -264,39 +297,6 @@ class Parser:
             print("Декодировано изображение Truecolor с альфа-каналом (RGBA).")
         else:
             raise NotImplementedError(f"Декодирование для цветового типа {color_type} не реализовано.")
-
-    def display_image(self):
-        if not self.pixels:
-            raise ValueError(
-                "Данные изображения не декодированы. Вызовите decompress_data() и decode_pixels() сначала.")
-
-        width = self.ihdr_information.width
-        height = self.ihdr_information.height
-
-        print(f"Отображаем изображение: {width}x{height}, режим: {self.mode}")
-
-        if self.mode == "RGB":
-            # Создаём изображение в режиме RGB
-            img = self._create_image(height, width, Modes.RGB)
-            if width <= 50 or height <= 50:
-                img = self._rescale_if_smaller_50px(height, img, width)
-            img.show()
-
-        elif self.mode == "P":
-            # Создаём изображение в режиме Palette (Indexed-color)
-            img = self._create_palette_image(height, width)
-            if width <= 50 or height <= 50:
-                img = self._rescale_if_smaller_50px(height, img, width)
-            img.show()
-
-        elif self.mode == "RGBA":
-            # Создаём изображение в режиме RGBA
-            img = self._create_image(height, width, Modes.RGBA)
-            if width <= 50 or height <= 50:
-                img = self._rescale_if_smaller_50px(height, img, width)
-            img.show()
-        else:
-            raise NotImplementedError(f"Режим {self.mode} не поддерживается для отображения.")
 
     def _create_palette_image(self, height, width):
         img = Image.new("P", (width, height))
