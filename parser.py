@@ -3,7 +3,7 @@ from typing import List
 from chunk import Chunk
 from ihdr_information import IHDRInformation
 from plte_information import PLTEInformation
-from PIL import Image
+from PIL import Image, ImageFilter
 from enum import StrEnum
 
 COLOR_TYPES = {
@@ -23,6 +23,7 @@ class Modes(StrEnum):
 
 class Parser:
     def __init__(self):
+        self.should_blur = False
         self.compressed_data_idat = b''
         self.chunks: List[Chunk] = []
         self.ihdr_information: IHDRInformation
@@ -42,7 +43,7 @@ class Parser:
             print()
             self._read_chunks(file)
             print()
-            print("Начинаем печатать чанки...")
+            print("Начинаем печатать чанки...\n")
             for chunk in self.chunks:
                 print(chunk)
                 # input("Нажмите Enter для продолжения \n")
@@ -53,6 +54,8 @@ class Parser:
                     self._parse_IDAT(chunk)
                 elif chunk.chunk_type == b'PLTE':
                     self._parse_PLTE(chunk)
+                elif chunk.chunk_type == b'tEXt' or chunk.chunk_type == b'iTXt' or chunk.chunk_type == b'zTXt':
+                    self._parse_text_chunk(chunk)
                 elif chunk.chunk_type == b'IEND':
                     break
 
@@ -98,27 +101,22 @@ class Parser:
         print(f"Отображаем изображение: {width}x{height}, режим: {self.mode}")
 
         if self.mode == "RGB":
-            # Создаём изображение в режиме RGB
             img = self._create_image(height, width, Modes.RGB)
-            if width <= 50 or height <= 50:
-                img = self._rescale_if_smaller_50px(height, img, width)
-            img.show()
-
         elif self.mode == "P":
-            # Создаём изображение в режиме Palette (Indexed-color)
             img = self._create_palette_image(height, width)
-            if width <= 50 or height <= 50:
-                img = self._rescale_if_smaller_50px(height, img, width)
-            img.show()
-
         elif self.mode == "RGBA":
-            # Создаём изображение в режиме RGBA
             img = self._create_image(height, width, Modes.RGBA)
-            if width <= 50 or height <= 50:
-                img = self._rescale_if_smaller_50px(height, img, width)
-            img.show()
         else:
             raise NotImplementedError(f"Режим {self.mode} не поддерживается для отображения.")
+
+        if self.should_blur:
+            print("Обнаружено '18+' в метаданных. Применяем размытие.")
+            img = img.filter(ImageFilter.GaussianBlur(radius=15))
+
+        if width <= 50 or height <= 50:
+            img = self._rescale_if_smaller_50px(height, img, width)
+
+        img.show()
 
     def _read_chunks(self, file):
         while True:
@@ -166,6 +164,20 @@ class Parser:
 
         for i in range(0, len(data), 3):
             self.palette.append(PLTEInformation(i // 3, data[i], data[i + 1], data[i + 2]))
+
+    def _parse_text_chunk(self, chunk: Chunk):
+        try:
+            data = chunk.data.decode('utf-8')
+            keyword, text = data.split('\x00', 1)
+            print(f"{keyword}: {text}\n")
+
+            if "18+" in text:
+                self.should_blur = True
+
+        except UnicodeDecodeError:
+            print("Ошибка декодирования текстового чанка.")
+        except ValueError:
+            print("Ошибка разбора текстового чанка.")
 
     def _get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
@@ -258,8 +270,8 @@ class Parser:
         color_type = self.ihdr_information.color_type
         bit_depth = self.ihdr_information.bit_depth
 
-        if bit_depth != 8:
-            raise NotImplementedError("Поддержка только 8-битной глубины реализована.")
+        # if bit_depth != 8:
+        #    raise NotImplementedError("Поддержка только 8-битной глубины реализована.")
 
         if color_type == 2:
             # Truecolor (RGB)
