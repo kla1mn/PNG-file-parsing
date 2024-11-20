@@ -4,22 +4,7 @@ from chunk import Chunk
 from ihdr_information import IHDRInformation
 from plte_information import PLTEInformation
 from PIL import Image, ImageFilter
-from enum import StrEnum
-from constants import MAX_WIDTH, MAX_HEIGHT
-
-COLOR_TYPES = {
-    0: 1,  # Grayscale
-    2: 3,  # Truecolor
-    3: 1,  # Indexed-color
-    4: 2,  # Grayscale with alpha
-    6: 4  # Truecolor with alpha
-}
-
-
-class Modes(StrEnum):
-    RGB = "RGB",
-    Palette = "P",
-    RGBA = "RGBA"
+from constants import *
 
 
 class Parser:
@@ -185,7 +170,8 @@ class Parser:
 
     def _get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
-        bytes_per_pixel = COLOR_TYPES.get(color_type, ValueError(f"Неподдерживаемый цветой тип: {color_type}"))
+        bytes_per_pixel = BYTES_ON_PIXEL_BY_COLOR_TYPE.get(color_type,
+                                                           ValueError(f"Неподдерживаемый цветой тип: {color_type}"))
         return bytes_per_pixel
 
     def _get_stride(self):
@@ -273,9 +259,6 @@ class Parser:
         # height = self.ihdr_information.height
         color_type = self.ihdr_information.color_type
         bit_depth = self.ihdr_information.bit_depth
-
-        # if bit_depth != 8:
-        #    raise NotImplementedError("Поддержка только 8-битной глубины реализована.")
 
         if color_type == 2:
             # Truecolor (RGB)
