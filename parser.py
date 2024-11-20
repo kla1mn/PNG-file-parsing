@@ -5,6 +5,7 @@ from ihdr_information import IHDRInformation
 from plte_information import PLTEInformation
 from PIL import Image, ImageFilter
 from enum import StrEnum
+from constants import MAX_WIDTH, MAX_HEIGHT
 
 COLOR_TYPES = {
     0: 1,  # Grayscale
@@ -34,7 +35,7 @@ class Parser:
         self.mode = None
 
     def parse(self, file_path: str):
-        with open(file_path, 'rb') as file:
+        with (open(file_path, 'rb') as file):
             signature = file.read(8)
             if signature != b'\x89PNG\r\n\x1a\n':
                 raise ValueError("Не PNG файл, попробуйте другой")
@@ -50,6 +51,9 @@ class Parser:
 
                 if chunk.chunk_type == b'IHDR':
                     self._parse_IHDR(chunk)
+                    if self.ihdr_information.width >= MAX_WIDTH or self.ihdr_information.height >= MAX_HEIGHT:
+                        print("PNG файл слишком большой, попробуйте другой")
+                        exit(0)
                 elif chunk.chunk_type == b'IDAT':
                     self._parse_IDAT(chunk)
                 elif chunk.chunk_type == b'PLTE':
