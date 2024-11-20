@@ -11,6 +11,7 @@ class Parser:
     def __init__(self):
         self.should_blur = False
         self.compressed_data_idat = b''
+        self.should_bw = False
         self.chunks: List[Chunk] = []
         self.ihdr_information: IHDRInformation
         self.palette: List[PLTEInformation] = []
@@ -43,7 +44,7 @@ class Parser:
                     self._parse_IDAT(chunk)
                 elif chunk.chunk_type == b'PLTE':
                     self._parse_PLTE(chunk)
-                elif chunk.chunk_type == b'tEXt' or chunk.chunk_type == b'iTXt' or chunk.chunk_type == b'zTXt':
+                elif chunk.chunk_type in [b'tEXt', b'iTXt', b'zTXt']:
                     self._parse_text_chunk(chunk)
                 elif chunk.chunk_type == b'IEND':
                     break
@@ -101,6 +102,10 @@ class Parser:
         if self.should_blur:
             print("Обнаружено '18+' в метаданных. Применяем размытие.")
             img = img.filter(ImageFilter.GaussianBlur(radius=15))
+
+        if self.should_bw:
+            print("Обнаружено '1950s vibe' в метаданных. Преобразуем изображение в черно-белый формат.")
+            img = img.convert("L")  # Преобразование в черно-белое
 
         if width <= 50 or height <= 50:
             img = self._rescale_if_smaller_50px(height, img, width)
@@ -162,6 +167,9 @@ class Parser:
 
             if "18+" in text:
                 self.should_blur = True
+
+            if "1950s vibe" in text:
+                self.should_bw = True
 
         except UnicodeDecodeError:
             print("Ошибка декодирования текстового чанка.")
