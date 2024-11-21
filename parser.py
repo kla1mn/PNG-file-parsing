@@ -10,8 +10,8 @@ from constants import *
 class Parser:
     def __init__(self):
         self.should_blur = False
-        self.compressed_data_idat = b''
         self.should_bw = False
+        self.compressed_data_idat = b''
         self.chunks: List[Chunk] = []
         self.ihdr_information: IHDRInformation
         self.palette: List[PLTEInformation] = []
@@ -105,7 +105,7 @@ class Parser:
 
         if self.should_bw:
             print("Обнаружено '1950s vibe' в метаданных. Преобразуем изображение в черно-белый формат.")
-            img = img.convert("L")  # Преобразование в черно-белое
+            img = self.apply_grayscale_with_transparency(img) # Преобразование в черно-белое
 
         if width <= 50 or height <= 50:
             img = self._rescale_if_smaller_50px(height, img, width)
@@ -329,3 +329,21 @@ class Parser:
         flat_pixels = [pixel for row in self.pixels for pixel in row]
         img.putdata(flat_pixels)
         return img
+
+    def apply_grayscale_with_transparency(self, image: Image) -> Image:
+        """
+        Преобразует цветное изображение в черно-белое, сохраняя прозрачность.
+        Меняет только цветные пиксели, игнорируя прозрачные.
+        """
+        if image.mode != "RGBA":
+            raise ValueError(
+                "Для сохранения прозрачности изображение должно быть в режиме RGBA.")
+
+        # Разделение изображения на каналы
+        r, g, b, a = image.split()
+
+        # Преобразование цветных каналов в черно-белый, сохраняя прозрачность
+        grayscale = Image.merge("RGB", (r, g, b)).convert("L")
+        result = Image.merge("RGBA", (grayscale, grayscale, grayscale, a))
+
+        return result
