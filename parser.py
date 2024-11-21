@@ -222,49 +222,6 @@ class Parser:
 
         print("Все фильтры успешно применены.")
 
-    @staticmethod
-    def _filter_sub(scanline, bpp):
-        recon = bytearray(scanline)
-        for i in range(bpp, len(recon)):
-            recon[i] = (recon[i] + recon[i - bpp]) % 256
-        return recon
-
-    @staticmethod
-    def _filter_up(scanline, previous):
-        recon = bytearray(scanline)
-        for i in range(len(recon)):
-            recon[i] = (recon[i] + previous[i]) % 256
-        return recon
-
-    @staticmethod
-    def _filter_average(scanline, previous, bpp):
-        recon = bytearray(scanline)
-        for i in range(len(recon)):
-            left = recon[i - bpp] if i >= bpp else 0
-            up = previous[i]
-            recon[i] = (recon[i] + (left + up) // 2) % 256
-        return recon
-
-    @staticmethod
-    def _filter_paeth(scanline, previous, bpp):
-        recon = bytearray(scanline)
-        for i in range(len(recon)):
-            left = recon[i - bpp] if i >= bpp else 0
-            up = previous[i]
-            up_left = previous[i - bpp] if i >= bpp else 0
-            p = left + up - up_left
-            pa = abs(p - left)
-            pb = abs(p - up)
-            pc = abs(p - up_left)
-            if pa <= pb and pa <= pc:
-                pr = left
-            elif pb <= pc:
-                pr = up
-            else:
-                pr = up_left
-            recon[i] = (recon[i] + pr) % 256
-        return recon
-
     def _decode_pixels(self):
         print("Декодируем пиксели из восстановленных данных...")
         color_type = self.ihdr_information.color_type
@@ -318,15 +275,58 @@ class Parser:
         img.putdata(flat_pixels)
         return img
 
-    @staticmethod
-    def _rescale_if_smaller_50px(height, width, img):
-        img = img.resize((width * SCALE_FACTOR, height * SCALE_FACTOR), Image.Resampling.NEAREST)
-        return img
-
     def _create_image(self, height, width, mode):
         img = Image.new(mode, (width, height))
         flat_pixels = [pixel for row in self.pixels for pixel in row]
         img.putdata(flat_pixels)
+        return img
+
+    @staticmethod
+    def _filter_sub(scanline, bpp):
+        recon = bytearray(scanline)
+        for i in range(bpp, len(recon)):
+            recon[i] = (recon[i] + recon[i - bpp]) % 256
+        return recon
+
+    @staticmethod
+    def _filter_up(scanline, previous):
+        recon = bytearray(scanline)
+        for i in range(len(recon)):
+            recon[i] = (recon[i] + previous[i]) % 256
+        return recon
+
+    @staticmethod
+    def _filter_average(scanline, previous, bpp):
+        recon = bytearray(scanline)
+        for i in range(len(recon)):
+            left = recon[i - bpp] if i >= bpp else 0
+            up = previous[i]
+            recon[i] = (recon[i] + (left + up) // 2) % 256
+        return recon
+
+    @staticmethod
+    def _filter_paeth(scanline, previous, bpp):
+        recon = bytearray(scanline)
+        for i in range(len(recon)):
+            left = recon[i - bpp] if i >= bpp else 0
+            up = previous[i]
+            up_left = previous[i - bpp] if i >= bpp else 0
+            p = left + up - up_left
+            pa = abs(p - left)
+            pb = abs(p - up)
+            pc = abs(p - up_left)
+            if pa <= pb and pa <= pc:
+                pr = left
+            elif pb <= pc:
+                pr = up
+            else:
+                pr = up_left
+            recon[i] = (recon[i] + pr) % 256
+        return recon
+
+    @staticmethod
+    def _rescale_if_smaller_50px(height, width, img):
+        img = img.resize((width * SCALE_FACTOR, height * SCALE_FACTOR), Image.Resampling.NEAREST)
         return img
 
     @staticmethod
