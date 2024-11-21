@@ -19,6 +19,7 @@ class Parser:
         self.image_data = []
         self.pixels = []
         self.mode = None
+        self.hidden_data = b''
 
     def parse(self, file_path: str):
         with (open(file_path, 'rb') as file):
@@ -46,6 +47,14 @@ class Parser:
                     self._parse_text_chunk(chunk)
                 elif chunk.chunk_type == b'IEND':
                     break
+
+            if self.hidden_data:
+                print("\nОбнаружены скрытые данные после IEND:")
+                if self._is_png(self.hidden_data):
+                    print("Скрытые данные содержат ещё один PNG файл. Начинаем обработку второго файла...")
+                    self._process_hidden_file(self.hidden_data)
+                else:
+                    print(f"Скрытый текст: {self.hidden_data.decode('utf-8', errors='replace')}")
 
     def decompress_data(self):
         print("Начинаем декомпрессию IDAT данных...")
@@ -135,6 +144,25 @@ class Parser:
             data = file.read(length)
             crc = file.read(4)
             self.chunks.append(Chunk(length, chunk_type, data, crc))
+
+            if chunk_type == b'IEND':
+                print("Обнаружен блок IEND. Проверяем на наличие скрытых данных...")
+                self.hidden_data = file.read()
+                break
+
+    @staticmethod
+    def _is_png(data: bytes) -> bool:
+        return data.startswith(b'\x89PNG\r\n\x1a\n')
+
+    @staticmethod
+    def _process_hidden_file(hidden_data: bytes):
+        with open("hidden_file.png", "wb") as hidden_file:
+            hidden_file.write(hidden_data)
+
+        hidden_parser = Parser()
+        hidden_parser.parse("hidden_file.png")
+        hidden_parser.decompress_data()
+        hidden_parser.display_image()
 
     def _parse_IHDR(self, chunk: Chunk):
         data = chunk.data
