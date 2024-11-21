@@ -26,14 +26,11 @@ class Parser:
             if signature != b'\x89PNG\r\n\x1a\n':
                 raise ValueError("Не PNG файл, попробуйте другой")
 
-            print(f"Сигнатура: {signature}")
-            print()
+            print(f"Сигнатура: {signature}\n")
             self._record_chunks(file)
-            print()
-            print("Начинаем печатать чанки...\n")
+            print("\nНачинаем печатать чанки...\n")
             for chunk in self.chunks:
                 print(chunk)
-                # input("Нажмите Enter для продолжения \n")
 
                 if chunk.chunk_type == b'IHDR':
                     self._parse_IHDR(chunk)
@@ -49,8 +46,6 @@ class Parser:
                     self._parse_text_chunk(chunk)
                 elif chunk.chunk_type == b'IEND':
                     break
-
-            # print(f"Parsed IHDR: {self.ihdr_information}")
 
     def decompress_data(self):
         print("Начинаем декомпрессию IDAT данных...")
@@ -80,34 +75,50 @@ class Parser:
     def display_image(self):
         if not self.pixels:
             raise ValueError(
-                "Данные изображения не декодированы. Вызовите decompress_data() и decode_pixels() сначала.")
+                "Данные изображения не декодированы. Вызовите decompress_data() и decode_pixels() сначала."
+            )
 
         width = self.ihdr_information.width
         height = self.ihdr_information.height
 
         print(f"Отображаем изображение: {width}x{height}, режим: {self.mode}")
 
-        if self.mode == "RGB":
+        if self.mode == Modes.RGB:
             img = self._create_image(height, width, Modes.RGB)
-        elif self.mode == "P":
+        elif self.mode == Modes.Palette:
             img = self._create_palette_image(height, width)
-        elif self.mode == "RGBA":
+        elif self.mode == Modes.RGBA:
             img = self._create_image(height, width, Modes.RGBA)
+        elif self.mode == Modes.L:
+            img = self._create_image(height, width, Modes.L)
+        elif self.mode == Modes.LA:
+            img = self._create_image_with_alpha(height, width, Modes.LA)
         else:
             raise NotImplementedError(f"Режим {self.mode} не поддерживается для отображения.")
 
+        img = self._apply_post_processing(img, width, height)
+
+        img.show()
+
+    def _apply_post_processing(self, img: Image, width: int, height: int) -> Image:
         if self.should_blur:
             print("Обнаружено '18+' в метаданных. Применяем размытие.")
             img = img.filter(ImageFilter.GaussianBlur(radius=15))
 
         if self.should_bw:
             print("Обнаружено '1950s vibe' в метаданных. Преобразуем изображение в черно-белый формат.")
-            img = self.apply_grayscale_with_transparency(img)
+            img = self._apply_grayscale_with_transparency(img)
 
         if width <= 50 or height <= 50:
             img = self._rescale_if_smaller_50px(height, width, img)
 
-        img.show()
+        return img
+
+    def _create_image_with_alpha(self, height: int, width: int, mode: str) -> Image:
+        img = Image.new(mode, (width, height))
+        flat_pixels = [pixel for row in self.pixels for pixel in row]
+        img.putdata(flat_pixels)
+        return img
 
     def _record_chunks(self, file):
         while True:
@@ -157,6 +168,7 @@ class Parser:
             self.palette.append(PLTEInformation(i // 3, data[i], data[i + 1], data[i + 2]))
 
     def _parse_text_chunk(self, chunk: Chunk):
+        data = ''
         try:
             data = chunk.data.decode('utf-8')
         except UnicodeDecodeError:
@@ -188,20 +200,15 @@ class Parser:
         previous_scanline = bytearray([0] * self._get_stride())
 
         for idx, (filter_type, scanline) in enumerate(self.raw_image):
-            if filter_type == 0:
-                # Фильтр None
+            if filter_type == FilterTypes.None_:
                 recon = bytearray(scanline)
-            elif filter_type == 1:
-                # Фильтр Sub
+            elif filter_type == FilterTypes.Sub:
                 recon = self._filter_sub(scanline, self._get_bytes_per_pixel())
-            elif filter_type == 2:
-                # Фильтр Up
+            elif filter_type == FilterTypes.Up:
                 recon = self._filter_up(scanline, previous_scanline)
-            elif filter_type == 3:
-                # Фильтр Average
+            elif filter_type == FilterTypes.Average:
                 recon = self._filter_average(scanline, previous_scanline, self._get_bytes_per_pixel())
-            elif filter_type == 4:
-                # Фильтр Paeth
+            elif filter_type == FilterTypes.Paeth:
                 recon = self._filter_paeth(scanline, previous_scanline, self._get_bytes_per_pixel())
             else:
                 print(f"Неизвестный тип фильтра: {filter_type}")
@@ -260,47 +267,45 @@ class Parser:
 
     def _decode_pixels(self):
         print("Декодируем пиксели из восстановленных данных...")
-        # width = self.ihdr_information.width
-        # height = self.ihdr_information.height
         color_type = self.ihdr_information.color_type
-        bit_depth = self.ihdr_information.bit_depth
 
-        if color_type == 2:
-            # Truecolor (RGB)
-            self.mode = "RGB"
-            self.pixels = []
-            for row in self.image_data:
-                row_pixels = []
-                for i in range(0, len(row), 3):
-                    R, G, B = row[i], row[i + 1], row[i + 2]
-                    row_pixels.append((R, G, B))
-                self.pixels.append(row_pixels)
+        if color_type == ColorTypes.L:
+            self.mode = Modes.L
+            self.pixels = self._decode_simple_pixels()
+            print("Декодировано изображение Grayscale (L).")
+
+        elif color_type == ColorTypes.RGB:
+            self.mode = Modes.RGB
+            self.pixels = self._decode_grouped_pixels(3)
             print("Декодировано изображение Truecolor (RGB).")
 
-        elif color_type == 3:
-            # Indexed-color (P)
-            self.mode = "P"
+        elif color_type == ColorTypes.P:
+            self.mode = Modes.Palette
             if not self.palette:
                 raise ValueError("PLTE chunk отсутствует для Indexed-color изображения.")
-            # Создаём палитру в формате, который понимает Pillow
-            self.pixels = []
-            for row in self.image_data:
-                self.pixels.append(list(row))  # Индексы палитры
-            print("Декодировано изображение Indexed-color.")
+            self.pixels = self._decode_simple_pixels()
+            print("Декодировано изображение Indexed-color (P).")
 
-        elif color_type == 6:
-            # Truecolor with alpha (RGBA)
-            self.mode = "RGBA"
-            self.pixels = []
-            for row in self.image_data:
-                row_pixels = []
-                for i in range(0, len(row), 4):
-                    R, G, B, A = row[i], row[i + 1], row[i + 2], row[i + 3]
-                    row_pixels.append((R, G, B, A))
-                self.pixels.append(row_pixels)
+        elif color_type == ColorTypes.LA:
+            self.mode = Modes.LA
+            self.pixels = self._decode_grouped_pixels(2)
+            print("Декодировано изображение Grayscale with alpha (LA).")
+
+        elif color_type == ColorTypes.RGBA:
+            self.mode = Modes.RGBA
+            self.pixels = self._decode_grouped_pixels(4)
             print("Декодировано изображение Truecolor с альфа-каналом (RGBA).")
         else:
             raise NotImplementedError(f"Декодирование для цветового типа {color_type} не реализовано.")
+
+    def _decode_simple_pixels(self):
+        return [list(row) for row in self.image_data]
+
+    def _decode_grouped_pixels(self, group_size):
+        return [
+            [tuple(row[i:i + group_size]) for i in range(0, len(row), group_size)]
+            for row in self.image_data
+        ]
 
     def _create_palette_image(self, height, width):
         img = Image.new("P", (width, height))
@@ -314,8 +319,8 @@ class Parser:
         return img
 
     @staticmethod
-    def _rescale_if_smaller_50px(height, width, img, scale_factor: int = 100):
-        img = img.resize((width * scale_factor, height * scale_factor), Image.Resampling.NEAREST)
+    def _rescale_if_smaller_50px(height, width, img):
+        img = img.resize((width * SCALE_FACTOR, height * SCALE_FACTOR), Image.Resampling.NEAREST)
         return img
 
     def _create_image(self, height, width, mode):
@@ -324,19 +329,14 @@ class Parser:
         img.putdata(flat_pixels)
         return img
 
-    def apply_grayscale_with_transparency(self, image: Image) -> Image:
-        """
-        Преобразует цветное изображение в черно-белое, сохраняя прозрачность.
-        Меняет только цветные пиксели, игнорируя прозрачные.
-        """
+    @staticmethod
+    def _apply_grayscale_with_transparency(image: Image) -> Image:
         if image.mode != "RGBA":
             raise ValueError(
                 "Для сохранения прозрачности изображение должно быть в режиме RGBA.")
 
-        # Разделение изображения на каналы
         r, g, b, a = image.split()
 
-        # Преобразование цветных каналов в черно-белый, сохраняя прозрачность
         grayscale = Image.merge("RGB", (r, g, b)).convert("L")
         result = Image.merge("RGBA", (grayscale, grayscale, grayscale, a))
 
