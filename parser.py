@@ -1,3 +1,4 @@
+import random
 import zlib
 from typing import List
 from chunk import Chunk
@@ -52,7 +53,7 @@ class Parser:
                 print("\nОбнаружены скрытые данные после IEND:")
                 if self._is_png(self.hidden_data):
                     print("Скрытые данные содержат ещё один PNG файл. Начинаем обработку второго файла...")
-                    self._process_hidden_file(self.hidden_data)
+                    self._process_hidden_file()
                 else:
                     print(f"Скрытый текст: {self.hidden_data.decode('utf-8', errors='replace')}")
 
@@ -154,13 +155,13 @@ class Parser:
     def _is_png(data: bytes) -> bool:
         return data.startswith(b'\x89PNG\r\n\x1a\n')
 
-    @staticmethod
-    def _process_hidden_file(hidden_data: bytes):
-        with open("hidden_data/hidden_file.png", "wb") as hidden_file:
-            hidden_file.write(hidden_data)
+    def _process_hidden_file(self):
+        num = random.randint(1, 1_000_000)
+        with open(f"hidden_data/hidden_file{num}.png", "wb") as hidden_file:
+            hidden_file.write(self.hidden_data)
 
         hidden_parser = Parser()
-        hidden_parser.parse("hidden_data/hidden_file.png")
+        hidden_parser.parse(f"hidden_data/hidden_file{num}.png")
         hidden_parser.decompress_data()
         hidden_parser.display_image()
 
