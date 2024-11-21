@@ -25,7 +25,7 @@ def embed_png_in_png(container_path: str, hidden_path: str, output_path: str):
 
 if __name__ == "__main__":
     embed_png_in_png(
-        container_path="images/rgb2.png",  # Путь к основной PNG
-        hidden_path="images/rgb.png",  # Путь к скрываемой PNG
-        output_path="images/rgb3.png"  # Путь для результата
+        container_path="images/originals/rgb.png",  # Путь к основной PNG
+        hidden_path="images/cat 1950s vibe.png",  # Путь к скрываемой PNG
+        output_path="images/test.png"  # Путь для результата
     )

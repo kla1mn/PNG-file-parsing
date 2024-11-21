@@ -15,6 +15,6 @@ if __name__ == "__main__":
     metadata = {
         "Warning": "18+"
     }
-    input_file = "images/cat.png"
-    output_file = "images/cat 18+.png"
+    input_file = "images/filters/cat.png"
+    output_file = "images/filters/cat 18+.png"
     add_metadata_to_png(input_file, output_file, metadata)
