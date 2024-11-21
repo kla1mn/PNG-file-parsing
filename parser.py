@@ -28,7 +28,7 @@ class Parser:
 
             print(f"Сигнатура: {signature}")
             print()
-            self._read_chunks(file)
+            self._record_chunks(file)
             print()
             print("Начинаем печатать чанки...\n")
             for chunk in self.chunks:
@@ -44,23 +44,20 @@ class Parser:
                     self._parse_IDAT(chunk)
                 elif chunk.chunk_type == b'PLTE':
                     self._parse_PLTE(chunk)
+                    print(f"Распарсили PLTE с {len(self.palette)} палитрой.\n")
                 elif chunk.chunk_type in [b'tEXt', b'iTXt', b'zTXt']:
                     self._parse_text_chunk(chunk)
                 elif chunk.chunk_type == b'IEND':
                     break
 
             # print(f"Parsed IHDR: {self.ihdr_information}")
-            if self.palette:
-                print(f"Распарсили PLTE с {len(self.palette)} палитрой.\n")
 
     def decompress_data(self):
         print("Начинаем декомпрессию IDAT данных...")
         decompressed_data = zlib.decompress(self.compressed_data_idat)
         print(f"Размер декомпрессионных данных: {len(decompressed_data)} байт")
 
-        bytes_per_pixel = self._get_bytes_per_pixel()
-
-        stride = bytes_per_pixel * self.ihdr_information.width
+        stride = self._get_stride()
         self.raw_image = []
 
         i = 0
@@ -105,21 +102,21 @@ class Parser:
 
         if self.should_bw:
             print("Обнаружено '1950s vibe' в метаданных. Преобразуем изображение в черно-белый формат.")
-            img = self.apply_grayscale_with_transparency(img) # Преобразование в черно-белое
+            img = self.apply_grayscale_with_transparency(img)
 
         if width <= 50 or height <= 50:
-            img = self._rescale_if_smaller_50px(height, img, width)
+            img = self._rescale_if_smaller_50px(height, width, img)
 
         img.show()
 
-    def _read_chunks(self, file):
+    def _record_chunks(self, file):
         while True:
             length_bytes = file.read(4)
             if len(length_bytes) < 4:
                 if len(length_bytes) == 0:
-                    print("Прочитали все чанки.")
+                    print("Записали все чанки.")
                 else:
-                    print("У файла в конце чанк битый.")
+                    print("У файла в конце чанк битый. Запись чанков может сработать неверно.")
                 break
 
             length = int.from_bytes(length_bytes, 'big')
@@ -162,19 +159,19 @@ class Parser:
     def _parse_text_chunk(self, chunk: Chunk):
         try:
             data = chunk.data.decode('utf-8')
-            keyword, text = data.split('\x00', 1)
-            print(f"{keyword}: {text}\n")
-
-            if "18+" in text:
-                self.should_blur = True
-
-            if "1950s vibe" in text:
-                self.should_bw = True
-
         except UnicodeDecodeError:
             print("Ошибка декодирования текстового чанка.")
         except ValueError:
             print("Ошибка разбора текстового чанка.")
+
+        keyword, text = data.split('\x00', 1)
+        print(f"{keyword}: {text}\n")
+
+        if "18+" in text:
+            self.should_blur = True
+
+        if "1950s vibe" in text:
+            self.should_bw = True
 
     def _get_bytes_per_pixel(self):
         color_type = self.ihdr_information.color_type
@@ -317,11 +314,8 @@ class Parser:
         return img
 
     @staticmethod
-    def _rescale_if_smaller_50px(height, img, width):
-        scale_factor = 100
-        new_width = width * scale_factor
-        new_height = height * scale_factor
-        img = img.resize((new_width, new_height), Image.Resampling.NEAREST)
+    def _rescale_if_smaller_50px(height, width, img, scale_factor: int = 100):
+        img = img.resize((width * scale_factor, height * scale_factor), Image.Resampling.NEAREST)
         return img
 
     def _create_image(self, height, width, mode):
