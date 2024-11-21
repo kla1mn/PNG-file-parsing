@@ -23,7 +23,6 @@ def embed_png_in_png(container_path: str, hidden_path: str, output_path: str):
     print(f"Скрытая PNG-картинка успешно встроена в {output_path}.")
 
 
-
 if __name__ == "__main__":
     embed_png_in_png(
         container_path="images/rgb.png",  # Путь к основной PNG

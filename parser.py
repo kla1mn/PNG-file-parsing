@@ -156,11 +156,11 @@ class Parser:
 
     @staticmethod
     def _process_hidden_file(hidden_data: bytes):
-        with open("hidden_file.png", "wb") as hidden_file:
+        with open("hidden_data/hidden_file.png", "wb") as hidden_file:
             hidden_file.write(hidden_data)
 
         hidden_parser = Parser()
-        hidden_parser.parse("hidden_file.png")
+        hidden_parser.parse("hidden_data/hidden_file.png")
         hidden_parser.decompress_data()
         hidden_parser.display_image()
 
