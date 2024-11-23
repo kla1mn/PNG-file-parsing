@@ -355,8 +355,8 @@ class Parser:
 
     @staticmethod
     def _rescale_if_smaller_50px(height, width, img):
-        img = img.resize((width * SCALE_FACTOR, height * SCALE_FACTOR), Image.Resampling.NEAREST)
-        return img
+        return img.resize((width * SCALE_FACTOR, height * SCALE_FACTOR),
+                          Image.Resampling.NEAREST) if height < 50 or width < 50 else img
 
     @staticmethod
     def _apply_grayscale_with_transparency(image: Image) -> Image:
