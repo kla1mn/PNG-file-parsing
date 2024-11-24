@@ -89,7 +89,7 @@ class TestParser(unittest.TestCase):
         parser = Parser()
         parser._parse_text_chunk(chunk)
 
-        self.assertTrue(parser.should_blur or parser.should_bw, "Text chunks should trigger metadata flags if present.")
+        self.assertTrue(parser.should_blur or parser.should_bw)
 
     def test_filter_sub(self):
         scanline = bytearray([10, 20, 30, 40])
@@ -98,7 +98,7 @@ class TestParser(unittest.TestCase):
 
         result = parser._filter_sub(scanline, 1)
 
-        self.assertEqual(result, expected, "Sub filter should modify scanline correctly.")
+        self.assertEqual(result, expected)
 
     def test_filter_up(self):
         scanline = bytearray([10, 20, 30, 40])
@@ -108,7 +108,7 @@ class TestParser(unittest.TestCase):
 
         result = parser._filter_up(scanline, previous)
 
-        self.assertEqual(result, expected, "Up filter should modify scanline correctly.")
+        self.assertEqual(result, expected)
 
     def test_process_hidden_png(self):
         """Test processing of a hidden PNG file."""
@@ -123,7 +123,7 @@ class TestParser(unittest.TestCase):
         parser = Parser()
         parser.parse(filepath)
 
-        self.assertTrue(parser._is_png(parser.hidden_data), "Hidden data should be identified as a PNG file.")
+        self.assertTrue(parser._is_png(parser.hidden_data))
 
     def test_grayscale_with_transparency(self):
         img = Image.new("RGBA", (10, 10), (255, 0, 0, 128))
@@ -198,7 +198,7 @@ class TestParser(unittest.TestCase):
         result = parser._filter_paeth(scanline, previous, bpp)
 
         expected = bytearray([150, 94, 80, 110])
-        self.assertEqual(result, expected, "Paeth filter should produce correct values.")
+        self.assertEqual(result, expected)
 
 
 if __name__ == "__main__":
