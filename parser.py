@@ -55,7 +55,7 @@ class Parser:
                     print("Скрытые данные содержат ещё один PNG файл. Начинаем обработку второго файла...")
                     self._process_hidden_file()
                 else:
-                    print(f"Скрытый текст: {self.hidden_data.decode('utf-8', errors='replace')}")
+                    print(f"Скрытый текст: {self.hidden_data.decode('utf-8', errors='ignore')}")
 
     def decompress_data(self):
         print("Начинаем декомпрессию IDAT данных...")

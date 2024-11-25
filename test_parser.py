@@ -89,7 +89,7 @@ class TestParser(unittest.TestCase):
         parser = Parser()
         parser._parse_text_chunk(chunk)
 
-        self.assertTrue(parser.should_blur or parser.should_bw)
+        self.assertTrue(parser.should_blur)
 
     def test_filter_sub(self):
         scanline = bytearray([10, 20, 30, 40])
@@ -111,7 +111,6 @@ class TestParser(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_process_hidden_png(self):
-        """Test processing of a hidden PNG file."""
         filepath = self._create_test_png("parent.png")
         hidden_filepath = self._create_test_png("hidden.png")
         with open(hidden_filepath, "rb") as hidden_file:
